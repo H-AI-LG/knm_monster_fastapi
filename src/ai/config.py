@@ -8,7 +8,7 @@ class AIConfig(BaseSettings):
     AI_MODEL: str = "ap.anthropic.claude-haiku-4-5-20251001-v1:0"
     AI_MAX_TOKENS: int = 300
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 ai_settings = AIConfig()
