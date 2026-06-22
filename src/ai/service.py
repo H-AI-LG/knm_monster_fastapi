@@ -8,7 +8,8 @@ from src.ai.schemas import ChatRequest, ChatResponse, PraiseRequest, PraiseRespo
 from src.artifacts import service as artifacts_service
 from src.artifacts.schemas import ArtifactDB
 
-_client = anthropic.AsyncAnthropic(api_key=ai_settings.ANTHROPIC_API_KEY)
+# AWS Bedrock 클라이언트 — AWS 자격증명은 환경변수 또는 ECS IAM Role로 자동 해결
+_client = anthropic.AsyncAnthropicBedrock(aws_region=ai_settings.AWS_REGION)
 
 
 def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
@@ -75,7 +76,7 @@ async def chat(request: ChatRequest, db: AsyncSession) -> ChatResponse:
         )
         return ChatResponse(reply=response.content[0].text)
     except anthropic.APIError as e:
-        raise AIServiceError(f"Claude API 오류: {e}")
+        raise AIServiceError(f"Bedrock API 오류: {e}")
 
 
 async def analyze_praise(request: PraiseRequest, db: AsyncSession) -> PraiseResponse:
