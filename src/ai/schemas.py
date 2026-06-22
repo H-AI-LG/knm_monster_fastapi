@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from src.models import CustomModel
 from src.ai.constants import STAGE_GREETING
 

@@ -11,7 +11,7 @@ class Config(BaseSettings):
     ]
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/knm"
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Config()
