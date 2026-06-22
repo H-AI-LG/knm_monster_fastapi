@@ -93,7 +93,7 @@ ruff format .
 
 ## 팀 작업 분담
 
-| 파트 | 담당 | 파일 |
-|------|------|------|
-| AI 연동 | 형준 | `src/ai/service.py` |
-| DB / 유물 데이터 | 수림 | `src/artifacts/service.py` |
+| 파트 | 파일 |
+|------|------|
+| AI 연동 | `src/ai/service.py` |
+| DB / 유물 데이터 | `src/artifacts/service.py` |
