@@ -10,8 +10,11 @@ from src.ai.schemas import ChatRequest, ChatResponse, PraiseRequest, PraiseRespo
 from src.artifacts import service as artifacts_service
 from src.artifacts.schemas import ArtifactDB
 
-# AWS Bedrock 클라이언트 — AWS 자격증명은 환경변수 또는 ECS IAM Role로 자동 해결
-_client = anthropic.AsyncAnthropicBedrock(aws_region=ai_settings.AWS_REGION)
+# Bedrock API 키 방식 (콘솔 > API 키에서 발급한 키 사용)
+_client = anthropic.AsyncAnthropic(
+    api_key=ai_settings.BEDROCK_API_KEY,
+    base_url=f"https://bedrock.{ai_settings.AWS_REGION}.amazonaws.com/v1",
+)
 
 
 def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
