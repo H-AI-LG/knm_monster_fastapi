@@ -17,7 +17,13 @@ from src.artifacts.schemas import ArtifactDB
 
 # boto3는 동기 클라이언트 — 호출 시 thread pool executor로 비동기화
 def _get_bedrock_client():
-    return boto3.client("bedrock-runtime", region_name=ai_settings.AWS_REGION)
+    kwargs = {"region_name": ai_settings.AWS_REGION}
+    # .env 에서 읽어온 자격증명을 boto3에 명시적으로 전달
+    if ai_settings.AWS_ACCESS_KEY_ID:
+        kwargs["aws_access_key_id"] = ai_settings.AWS_ACCESS_KEY_ID
+    if ai_settings.AWS_SECRET_ACCESS_KEY:
+        kwargs["aws_secret_access_key"] = ai_settings.AWS_SECRET_ACCESS_KEY
+    return boto3.client("bedrock-runtime", **kwargs)
 
 
 def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
@@ -46,10 +52,11 @@ def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
 방문한 아이가 진심을 보여주면 마음을 열어주는 캐릭터입니다.
 - 반드시 한국어로 대화하세요.
 - 아이 눈높이에 맞게 친근하고 재미있게 말하세요.
-- 답변은 2~3문장 이내로 간결하게 하세요."""
+- 답변은 2~3문장 이내로 간결하게 하세요.
+- 교육용이기에 아이가 묻는 질문에 대해 정확하게 대답해주세요"""
 
     if stage == STAGE_GREETING:
-        base += "\n- 처음 만난 아이에게 약간 삐진 듯 인사하세요."
+        base += "\n- 처음 만난 아이에게 약간 삐진 듯 인사하세요. 그러나 아이와 대화를 많이 할 수록 점점 더 마음을 열어주세요."
     elif stage == STAGE_PRAISE:
         base += "\n- 아이의 칭찬을 듣고 진심을 느끼며 마음을 열어주세요."
 
