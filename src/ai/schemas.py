@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from src.models import CustomModel
 from src.ai.constants import STAGE_GREETING
 
@@ -13,7 +15,7 @@ class ChatRequest(CustomModel):
 
 class ChatResponse(CustomModel):
     reply: str
-    score: float | None = None  # 칭찬 배틀 점수 0.0~1.0, 다른 단계는 None
+    score: Optional[float] = None  # 칭찬 배틀 점수 0.0~1.0, 다른 단계는 None
 
 
 class PraiseRequest(CustomModel):
