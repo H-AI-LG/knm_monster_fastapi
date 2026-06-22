@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# 환경 변수
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# 테스트
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ruff
+.ruff_cache/
