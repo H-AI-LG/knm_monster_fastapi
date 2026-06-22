@@ -3,7 +3,8 @@ from src.ai.constants import STAGE_GREETING
 
 
 class ChatRequest(CustomModel):
-    artifact_id: str
+    artifact_id: str        # 게임 내부 ID (artifact_001 등)
+    artifact_name: str      # 한국어 유물명 — DB 조회 키 (예: "주먹도끼")
     message: str
     stage: str = STAGE_GREETING  # greeting | dialogue | quiz | praise
 

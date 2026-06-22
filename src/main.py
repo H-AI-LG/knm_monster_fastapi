@@ -11,6 +11,8 @@ from src.artifacts.router import router as artifacts_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from src.database import create_tables
+    await create_tables()
     yield
 
 

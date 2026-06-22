@@ -1,24 +1,23 @@
 from src.models import CustomModel
 
 
-class QuizOption(CustomModel):
-    index: int
-    text: str
-
-
-class ArtifactQuiz(CustomModel):
-    question: str
-    options: list[QuizOption]
-    answer_index: int
-
-
-class ArtifactResponse(CustomModel):
-    id: str
-    name: str
-    era: str
-    grade: str        # 일반 | 고급 | 전설 | 보스
-    persona: str
-    greeting: str
+# DB에서 읽어온 유물 데이터 (내부용)
+class ArtifactDB(CustomModel):
+    id: int
+    title: str
     description: str
-    image_url: str
-    quiz: ArtifactQuiz
+    subdescription: str  # 분류 카테고리
+    temporal: str        # 시대
+    spatial: str         # 국적/출토지
+    medium: str          # 재질
+    extent: str          # 크기
+    url: str
+
+
+# API 응답용
+class ArtifactSearchResponse(CustomModel):
+    id: int
+    title: str
+    temporal: str
+    subdescription: str
+    medium: str
