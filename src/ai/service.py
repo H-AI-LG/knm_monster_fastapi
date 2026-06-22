@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-import anthropic
+import asyncio
+import functools
+import json
+from typing import Optional
+
+import boto3
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.config import ai_settings
@@ -10,11 +15,9 @@ from src.ai.schemas import ChatRequest, ChatResponse, PraiseRequest, PraiseRespo
 from src.artifacts import service as artifacts_service
 from src.artifacts.schemas import ArtifactDB
 
-# Bedrock API 키 방식 (콘솔 > API 키에서 발급한 키 사용)
-_client = anthropic.AsyncAnthropic(
-    api_key=ai_settings.BEDROCK_API_KEY,
-    base_url=f"https://bedrock.{ai_settings.AWS_REGION}.amazonaws.com/v1",
-)
+# boto3는 동기 클라이언트 — 호출 시 thread pool executor로 비동기화
+def _get_bedrock_client():
+    return boto3.client("bedrock-runtime", region_name=ai_settings.AWS_REGION)
 
 
 def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
@@ -53,6 +56,17 @@ def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
     return base
 
 
+def _sync_converse(system_prompt: str, message: str, max_tokens: int) -> str:
+    client = _get_bedrock_client()
+    response = client.converse(
+        modelId=ai_settings.AI_MODEL,
+        system=[{"text": system_prompt}],
+        messages=[{"role": "user", "content": [{"text": message}]}],
+        inferenceConfig={"maxTokens": max_tokens},
+    )
+    return response["output"]["message"]["content"][0]["text"]
+
+
 async def chat(request: ChatRequest, db: AsyncSession) -> ChatResponse:
     try:
         artifact = await artifacts_service.get_by_name(request.artifact_name, db)
@@ -73,15 +87,25 @@ async def chat(request: ChatRequest, db: AsyncSession) -> ChatResponse:
     system_prompt = _build_system_prompt(artifact_schema, request.stage)
 
     try:
-        response = await _client.messages.create(
-            model=ai_settings.AI_MODEL,
-            max_tokens=ai_settings.AI_MAX_TOKENS,
-            system=system_prompt,
-            messages=[{"role": "user", "content": request.message}],
+        loop = asyncio.get_event_loop()
+        reply = await loop.run_in_executor(
+            None,
+            functools.partial(_sync_converse, system_prompt, request.message, ai_settings.AI_MAX_TOKENS),
         )
-        return ChatResponse(reply=response.content[0].text)
-    except anthropic.APIError as e:
-        raise AIServiceError(f"Bedrock API 오류: {e}")
+        return ChatResponse(reply=reply)
+    except Exception as e:
+        raise AIServiceError(f"Bedrock Converse API 오류: {e}")
+
+
+def _sync_converse_praise(system_prompt: str, praise_text: str) -> str:
+    client = _get_bedrock_client()
+    response = client.converse(
+        modelId=ai_settings.AI_MODEL,
+        system=[{"text": system_prompt}],
+        messages=[{"role": "user", "content": [{"text": praise_text}]}],
+        inferenceConfig={"maxTokens": 200},
+    )
+    return response["output"]["message"]["content"][0]["text"]
 
 
 async def analyze_praise(request: PraiseRequest, db: AsyncSession) -> PraiseResponse:
@@ -96,14 +120,12 @@ async def analyze_praise(request: PraiseRequest, db: AsyncSession) -> PraiseResp
 JSON 형식으로만 답하세요: {{"score": 0.0~1.0, "feedback": "한 줄 피드백"}}"""
 
     try:
-        response = await _client.messages.create(
-            model=ai_settings.AI_MODEL,
-            max_tokens=200,
-            system=system_prompt,
-            messages=[{"role": "user", "content": request.praise_text}],
+        loop = asyncio.get_event_loop()
+        raw = await loop.run_in_executor(
+            None,
+            functools.partial(_sync_converse_praise, system_prompt, request.praise_text),
         )
-        import json
-        result = json.loads(response.content[0].text)
+        result = json.loads(raw)
         return PraiseResponse(score=float(result["score"]), feedback=result["feedback"])
     except Exception as e:
         raise AIServiceError(f"칭찬 분석 오류: {e}")
