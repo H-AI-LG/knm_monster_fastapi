@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
+from src.artifacts.schemas import ArtifactSummary
 from src.database import get_db
 from src.users import service as users_service
-from src.users.schemas import LoginRequest, LoginResponse, InterestChoiceResponse
+from src.users.schemas import CollectArtifactRequest, CollectArtifactResponse, LoginRequest, LoginResponse, InterestChoiceResponse
 from src.users.constants import INTEREST_CHOICES
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -37,3 +38,20 @@ async def login(
         user_id=user.id,
         name=user.name,
     )
+
+
+@router.post("/{user_id}/artifacts", response_model=CollectArtifactResponse, status_code=201)
+async def collect_artifact(
+    user_id: int,
+    body: CollectArtifactRequest,
+    db: AsyncSession = Depends(get_db),
+) -> CollectArtifactResponse:
+    return await users_service.collect_artifact(user_id, body.artifact_id, db)
+
+
+@router.get("/{user_id}/artifacts", response_model=list[ArtifactSummary])
+async def list_collected_artifacts(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> list[ArtifactSummary]:
+    return await users_service.list_collected_artifacts(user_id, db)

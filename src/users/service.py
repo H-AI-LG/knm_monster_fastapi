@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from src.users.models import User
-from src.users.schemas import LoginRequest
-from src.artifacts.models import Artifact
 from sqlalchemy import or_
+
+from src.artifacts.exceptions import ArtifactNotFound
+from src.artifacts.models import Artifact, GameArtifact, UserArtifact
+from src.artifacts.schemas import ArtifactSummary
+from src.users.exceptions import UserNotFound
+from src.users.models import User
+from src.users.schemas import CollectArtifactResponse, LoginRequest
 
 async def authenticate_or_register_user(db: AsyncSession, login_data: LoginRequest):
     
@@ -38,6 +45,65 @@ async def authenticate_or_register_user(db: AsyncSession, login_data: LoginReque
         print(f"👋 기존 학생 로그인 및 정보 업데이트 완료: {user.name}")
 
     return user
+
+async def collect_artifact(
+    user_id: int, artifact_id: str, db: AsyncSession
+) -> CollectArtifactResponse:
+    user = await db.get(User, user_id)
+    if not user:
+        raise UserNotFound(user_id)
+
+    artifact = await db.get(GameArtifact, artifact_id)
+    if not artifact:
+        raise ArtifactNotFound(artifact_id)
+
+    stmt = (
+        insert(UserArtifact)
+        .values(user_id=user_id, artifact_id=artifact_id)
+        .on_conflict_do_nothing(constraint="uq_user_artifact")
+        .returning(UserArtifact.artifact_id, UserArtifact.collected_at)
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+
+    row = result.one_or_none()
+    if row is None:
+        existing = await db.execute(
+            select(UserArtifact.artifact_id, UserArtifact.collected_at).where(
+                UserArtifact.user_id == user_id,
+                UserArtifact.artifact_id == artifact_id,
+            )
+        )
+        row = existing.one()
+
+    return CollectArtifactResponse(artifact_id=row.artifact_id, collected_at=row.collected_at)
+
+
+async def list_collected_artifacts(user_id: int, db: AsyncSession) -> list[ArtifactSummary]:
+    user = await db.get(User, user_id)
+    if not user:
+        raise UserNotFound(user_id)
+
+    result = await db.execute(
+        select(GameArtifact)
+        .join(UserArtifact, UserArtifact.artifact_id == GameArtifact.id)
+        .where(UserArtifact.user_id == user_id)
+        .order_by(UserArtifact.collected_at)
+    )
+    artifacts = result.scalars().all()
+    return [
+        ArtifactSummary(
+            id=a.id,
+            number=a.number,
+            name=a.name,
+            grade=a.grade,
+            era=a.era,
+            image_key=a.image_key,
+            zone=a.zone,
+        )
+        for a in artifacts
+    ]
+
 
 async def get_recommended_artifacts(db: AsyncSession, user_interests: str, limit_count: int = 5):
     """

@@ -18,8 +18,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.artifacts.models import Artifact
+import src.users.models
 from src.database import Base
-
+from src.users.models import User
 
 def parse_row(row: dict) -> dict:
     return {

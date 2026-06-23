@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
 from src.database import Base
+
+if TYPE_CHECKING:
+    from src.users.models import User
 
 
 class Artifact(Base):
@@ -106,3 +110,25 @@ class GameArtifactQuiz(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     artifact: Mapped[GameArtifact] = relationship(back_populates="quizzes")
+
+
+class UserArtifact(Base):
+    """유저가 수집한(미션 완수한) 유물 기록 — 도감"""
+    __tablename__ = "user_artifacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    artifact_id: Mapped[str] = mapped_column(
+        ForeignKey("game_artifacts.id", ondelete="CASCADE"), index=True
+    )
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="collected_artifacts")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "artifact_id", name="uq_user_artifact"),
+    )

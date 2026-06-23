@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+from datetime import datetime
 from typing import List, Optional
+
 from pydantic import BaseModel, Field, ConfigDict
+
+from src.models import CustomModel
 
 class InterestChoiceResponse(BaseModel):
     code: str
@@ -35,3 +41,12 @@ class LoginResponse(BaseModel):
     name: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CollectArtifactRequest(CustomModel):
+    artifact_id: str
+
+
+class CollectArtifactResponse(CustomModel):
+    artifact_id: str
+    collected_at: datetime

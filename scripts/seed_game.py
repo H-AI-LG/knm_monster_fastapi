@@ -23,6 +23,7 @@ from src.artifacts.models import (
     GameArtifactDialogueChoice,
     GameArtifactQuiz,
 )
+import src.users.models
 from src.config import settings
 from src.database import Base
 
