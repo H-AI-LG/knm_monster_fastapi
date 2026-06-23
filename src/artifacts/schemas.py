@@ -16,10 +16,36 @@ class ArtifactDB(CustomModel):
     url: str
 
 
-# API 응답용
-class ArtifactSearchResponse(CustomModel):
+class DialogueChoice(CustomModel):
+    text: str
+    answer: str
+
+
+class Dialogue(CustomModel):
+    question: str
+    choices: list[DialogueChoice]
+
+
+class ArtifactSummary(CustomModel):
+    id: str
+    number: str
+    name: str
+    grade: str | None = None
+    era: str | None = None
+    image_key: str | None = None
+    zone: str | None = None
+
+
+class ArtifactDetail(ArtifactSummary):
+    persona: str | None = None
+    image_path: str | None = None
+    greeting_fallback: str | None = None
+    dialogues: list[Dialogue] = []
+
+
+class QuizResponse(CustomModel):
     id: int
-    title: str
-    temporal: str
-    subdescription: str
-    medium: str
+    question: str
+    options: list[str]
+    answer_index: int
+    explanation: str | None = None
