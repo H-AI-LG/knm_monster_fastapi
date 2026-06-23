@@ -3,9 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 
 from src.artifacts import service as artifacts_service
+from src.artifacts.models import GameArtifact
 from src.artifacts.schemas import ArtifactDetail, ArtifactSummary, QuizResponse
 from src.database import get_db
 
@@ -49,7 +50,7 @@ async def get_recommended_artifacts(
     user_view_time = user.view_time if user.view_time else 60
     total_limit = max(10, (user_view_time // 6))
     
-    artifacts = []
+    artifacts: list[GameArtifact] = []
     
     if user.interests:
         user_code_list = [c.strip() for c in user.interests.split(",") if c.strip()]
@@ -58,8 +59,8 @@ async def get_recommended_artifacts(
         # 카테고리당 가져올 목표 개수 계산
         limit_per_category = max(1, total_limit // num_categories) if num_categories > 0 else total_limit
         
-        seen_ids = set()
-        seen_titles = set()
+        seen_ids: set[str] = set()
+        seen_names: set[str] = set()
         
         for code in user_code_list:
             # 현재 코드에 해당하는 카테고리 찾기
@@ -71,15 +72,30 @@ async def get_recommended_artifacts(
             
             # 해당 카테고리 안의 키워드들 돌기
             for kw in category_info["keywords"]:
-                search_results = await artifacts_service.search(kw, db)
+                search_pattern = f"%{kw}%"
+                search_result = await db.execute(
+                    select(GameArtifact)
+                    .where(
+                        or_(
+                            GameArtifact.name.ilike(search_pattern),
+                            GameArtifact.era.ilike(search_pattern),
+                            GameArtifact.persona.ilike(search_pattern),
+                            GameArtifact.greeting_fallback.ilike(search_pattern),
+                            GameArtifact.zone.ilike(search_pattern),
+                        )
+                    )
+                    .order_by(GameArtifact.number)
+                    .limit(total_limit)
+                )
+                search_results = search_result.scalars().all()
                 
                 for a in search_results:
-                    if a.id in seen_ids or (a.title and a.title in seen_titles):
+                    if a.id in seen_ids or (a.name and a.name in seen_names):
                         continue
                         
                     seen_ids.add(a.id)
-                    if a.title:
-                        seen_titles.add(a.title)
+                    if a.name:
+                        seen_names.add(a.name)
                         
                     artifacts.append(a)
                     category_artifacts_count += 1
@@ -97,12 +113,18 @@ async def get_recommended_artifacts(
 
     # 4. 관심사가 없거나 검색 결과가 총 10개가 안 된다면 기본 유물로 잔여석 채우기
     if len(artifacts) < total_limit:
-        default_results = await artifacts_service.search("", db)
+        default_result = await db.execute(
+            select(GameArtifact)
+            .order_by(GameArtifact.number)
+            .limit(total_limit * 2)
+        )
+        default_results = default_result.scalars().all()
+
         for a in default_results:
             if len(artifacts) >= total_limit:
                 break
             # 중복 검사
-            if a.id not in [art.id for art in artifacts] and (not a.title or a.title not in [art.title for art in artifacts]):
+            if a.id not in [art.id for art in artifacts] and (not a.name or a.name not in [art.name for art in artifacts]):
                 artifacts.append(a)
                 
 
