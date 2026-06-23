@@ -31,11 +31,11 @@ async def get_artifact(
     return await artifacts_service.get_game_artifact(artifact_id, db)
 
 
-@router.get("/recommend/{user_id}", response_model=list[ArtifactSearchResponse])
+@router.get("/recommend/{user_id}", response_model=list[ArtifactSummary])
 async def get_recommended_artifacts(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-) -> list[ArtifactSearchResponse]:
+) -> list[ArtifactSummary]:
     ### 사용자 관심사 기반 맞춤형 유물 추천 API(최대 10개)
     
     # 로그인한 유저의 정보와 관심사 가져오기
@@ -107,12 +107,14 @@ async def get_recommended_artifacts(
                 
 
     return [
-        ArtifactSearchResponse(
+        ArtifactSummary(
             id=a.id,
-            title=a.title or "",
-            temporal=a.temporal or "",
-            subdescription=a.subdescription or "",
-            medium=a.medium or "",
+            number=a.number,
+            name=a.name,
+            grade=a.grade,
+            era=a.era,
+            image_key=a.image_key,
+            zone=a.zone,
         )
         for a in artifacts[:total_limit]  
     ]
