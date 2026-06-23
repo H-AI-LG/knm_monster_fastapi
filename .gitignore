@@ -22,3 +22,6 @@ htmlcov/
 
 # ruff
 .ruff_cache/
+
+# 데이터
+*.csv
