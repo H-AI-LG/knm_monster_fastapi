@@ -18,7 +18,6 @@ async def authenticate_or_register_user(db: AsyncSession, login_data: LoginReque
         user = User(
             name=login_data.name,
             parent_phone=login_data.parent_phone,
-            parent_email=login_data.parent_email, 
             interests=login_data.interests,      
             view_time=login_data.view_time   
         )
@@ -29,8 +28,6 @@ async def authenticate_or_register_user(db: AsyncSession, login_data: LoginReque
     
     # 기존에 있던 유저 로그인 시, 추가 정보가 있으면 업데이트
     else:
-        if login_data.parent_email is not None:
-            user.parent_email = login_data.parent_email
         if login_data.interests is not None:
             user.interests = login_data.interests
         if login_data.view_time is not None:
