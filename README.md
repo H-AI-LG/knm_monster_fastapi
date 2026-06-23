@@ -20,9 +20,14 @@
 | GET | `/health` | 서버 상태 확인 |
 | POST | `/api/chat` | 유물 정령 AI 대화 |
 | POST | `/api/chat/praise` | 칭찬 배틀 텍스트 분석 |
-| GET | `/api/artifacts/list` | 유물 목록 검색 |
+| GET | `/api/artifacts` | 유물 목록 조회 (`?zone=` 필터 가능) |
+| GET | `/api/artifacts/recommend/{user_id}` | 관심사 기반 유물 추천 |
 | GET | `/api/artifacts/{id}` | 유물 상세 조회 |
 | GET | `/api/artifacts/{id}/quizzes` | 유물 퀴즈 조회 |
+| GET | `/api/users/interests` | 관심사 카테고리 목록 |
+| POST | `/api/users/login` | 로그인 |
+| POST | `/api/users/{user_id}/artifacts` | 유물 수집 기록 (퀴즈 통과 후 호출) |
+| GET | `/api/users/{user_id}/artifacts` | 도감 조회 — 수집한 유물 목록 |
 
 ### 프로젝트 구조
 
@@ -39,11 +44,19 @@ src/
 │   ├── service.py
 │   ├── config.py
 │   └── exceptions.py
-└── artifacts/        # 유물 데이터 모듈
+├── artifacts/        # 유물 데이터 모듈
+│   ├── router.py
+│   ├── schemas.py
+│   ├── models.py     # GameArtifact, UserArtifact(도감)
+│   ├── service.py
+│   └── exceptions.py
+└── users/            # 유저 모듈
     ├── router.py
     ├── schemas.py
-    ├── models.py     # SQLAlchemy ORM
-    └── service.py
+    ├── models.py
+    ├── service.py
+    ├── exceptions.py
+    └── constants.py  # 관심사 카테고리
 ```
 
 ---
