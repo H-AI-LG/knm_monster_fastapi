@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_
 
 from src.artifacts import service as artifacts_service
-from src.artifacts.schemas import ArtifactDB, ArtifactSearchResponse
+from src.artifacts.schemas import ArtifactDetail, ArtifactSummary, QuizResponse
 from src.database import get_db
 
 from src.users.models import User
@@ -13,31 +15,21 @@ from src.users.constants import INTEREST_CHOICES
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
 
-@router.get("/search", response_model=list[ArtifactSearchResponse])
-async def search_artifacts(
-    q: str,
+@router.get("", response_model=list[ArtifactSummary])
+async def list_artifacts(
+    zone: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-) -> list[ArtifactSearchResponse]:
-    artifacts = await artifacts_service.search(q, db)
-    return [
-        ArtifactSearchResponse(
-            id=a.id,
-            title=a.title or "",
-            temporal=a.temporal or "",
-            subdescription=a.subdescription or "",
-            medium=a.medium or "",
-        )
-        for a in artifacts
-    ]
+) -> list[ArtifactSummary]:
+    return await artifacts_service.list_game_artifacts(zone, db)
 
 
-@router.get("/{artifact_id}", response_model=ArtifactDB)
+@router.get("/{artifact_id}", response_model=ArtifactDetail)
 async def get_artifact(
-    artifact_id: int,
+    artifact_id: str,
     db: AsyncSession = Depends(get_db),
-) -> ArtifactDB:
-    artifact = await artifacts_service.get_by_id(artifact_id, db)
-    return artifacts_service.to_schema(artifact)
+) -> ArtifactDetail:
+    return await artifacts_service.get_game_artifact(artifact_id, db)
+
 
 @router.get("/recommend/{user_id}", response_model=list[ArtifactSearchResponse])
 async def get_recommended_artifacts(
