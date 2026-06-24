@@ -40,7 +40,7 @@ async def get_recommended_artifacts(
     
     # (30분 -> 5개, 60분 -> 10개, 90분 -> 15개, 120분 -> 20개)
     user_view_time = user.view_time if user.view_time else 60
-    total_limit = max(10, (user_view_time // 6))
+    total_limit = max(1, (user_view_time // 6))
     
     artifacts: list[GameArtifact] = []
     
