@@ -36,9 +36,18 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" | base64 --ignore-garbage -d > ~/.ssh/ec2_key
+          python3 -c "
+          import os
+          key = os.environ['SSH_KEY']
+          with open(os.path.expanduser('~/.ssh/ec2_key'), 'w') as f:
+              f.write(key)
+              if not key.endswith('\n'):
+                  f.write('\n')
+          "
           chmod 600 ~/.ssh/ec2_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
