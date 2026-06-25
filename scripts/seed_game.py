@@ -58,6 +58,15 @@ ZONE_MAP: dict[str, str] = {
     "artifact_013": "medieval",
     "artifact_015": "medieval",
     "artifact_024": "medieval",
+    "artifact_047": "prehistory",
+    "artifact_048": "ancient",
+    "artifact_049": "ancient",
+    "artifact_050": "sillaBalhae",
+    "artifact_051": "sillaBalhae",
+    "artifact_052": "sillaBalhae",
+    "artifact_053": "goryeo",
+    "artifact_054": "goryeo",
+    "artifact_055": "medieval",
 }
 
 
