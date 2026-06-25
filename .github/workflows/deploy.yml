@@ -66,8 +66,8 @@ jobs:
             docker run -d \
               --name $CONTAINER_NAME \
               --restart always \
+              --network host \
               --env-file /home/ec2-user/.env \
-              -p 80:8000 \
               $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
             docker image prune -f
