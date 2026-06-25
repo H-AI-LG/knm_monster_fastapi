@@ -44,13 +44,13 @@ class GameArtifact(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     number: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    grade: Mapped[str | None] = mapped_column(String)
-    era: Mapped[str | None] = mapped_column(String)
-    persona: Mapped[str | None] = mapped_column(String)
-    image_key: Mapped[str | None] = mapped_column(String)
-    image_path: Mapped[str | None] = mapped_column(String)
-    zone: Mapped[str | None] = mapped_column(String, index=True)
-    greeting_fallback: Mapped[str | None] = mapped_column(Text)
+    grade: Mapped[Optional[str]] = mapped_column(String)
+    era: Mapped[Optional[str]] = mapped_column(String)
+    persona: Mapped[Optional[str]] = mapped_column(String)
+    image_key: Mapped[Optional[str]] = mapped_column(String)
+    image_path: Mapped[Optional[str]] = mapped_column(String)
+    zone: Mapped[Optional[str]] = mapped_column(String, index=True)
+    greeting_fallback: Mapped[Optional[str]] = mapped_column(Text)
 
     dialogues: Mapped[list[GameArtifactDialogue]] = relationship(
         back_populates="artifact",
@@ -106,7 +106,7 @@ class GameArtifactQuiz(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[list] = mapped_column(JSONB, nullable=False)
     answer_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    explanation: Mapped[str | None] = mapped_column(Text)
+    explanation: Mapped[Optional[str]] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     artifact: Mapped[GameArtifact] = relationship(back_populates="quizzes")
