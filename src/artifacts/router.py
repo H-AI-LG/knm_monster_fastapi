@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, func
 
 from src.artifacts import service as artifacts_service
 from src.artifacts.models import GameArtifact
@@ -24,101 +24,88 @@ async def list_artifacts(
     return await artifacts_service.list_game_artifacts(zone, db)
 
 
+ZONES = ["prehistory", "ancient", "sillaBalhae", "goryeo", "medieval"]
+
 @router.get("/recommend/{user_id}", response_model=list[ArtifactSummary])
 async def get_recommended_artifacts(
     user_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> list[ArtifactSummary]:
-    ### 사용자 관심사 기반 맞춤형 유물 추천 API(최대 10개)
-    
-    # 로그인한 유저의 정보와 관심사 가져오기
     user_result = await db.execute(select(User).filter(User.id == user_id))
     user = user_result.scalar_one_or_none()
-    
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # (30분 -> 5개, 60분 -> 10개, 90분 -> 15개, 120분 -> 20개)
+
+    # 30분→5개, 60분→10개, 90분→15개, 120분→20개
     user_view_time = user.view_time if user.view_time else 60
-    total_limit = max(1, (user_view_time // 6))
-    
-    artifacts: list[GameArtifact] = []
-    
+    total_limit = max(1, user_view_time // 6)
+
+    # 관심사 키워드 수집
+    keywords: list[str] = []
     if user.interests:
-        user_code_list = [c.strip() for c in user.interests.split(",") if c.strip()]
-        num_categories = len(user_code_list)
-        
-        # 카테고리당 가져올 목표 개수 계산
-        limit_per_category = max(1, total_limit // num_categories) if num_categories > 0 else total_limit
-        
-        seen_ids: set[str] = set()
-        seen_names: set[str] = set()
-        
-        for code in user_code_list:
-            # 현재 코드에 해당하는 카테고리 찾기
-            category_info = next((c for c in INTEREST_CHOICES if c["code"] == code), None)
-            if not category_info:
-                continue
-                
-            category_artifacts_count = 0
-            
-            # 해당 카테고리 안의 키워드들 돌기
-            for kw in category_info["keywords"]:
-                search_pattern = f"%{kw}%"
-                search_result = await db.execute(
-                    select(GameArtifact)
-                    .where(
-                        or_(
-                            GameArtifact.name.ilike(search_pattern),
-                            GameArtifact.era.ilike(search_pattern),
-                            GameArtifact.persona.ilike(search_pattern),
-                            GameArtifact.greeting_fallback.ilike(search_pattern),
-                            GameArtifact.zone.ilike(search_pattern),
-                        )
-                    )
-                    .order_by(GameArtifact.number)
-                    .limit(total_limit)
+        for code in [c.strip() for c in user.interests.split(",") if c.strip()]:
+            cat = next((c for c in INTEREST_CHOICES if c["code"] == code), None)
+            if cat:
+                keywords.extend(cat["keywords"])
+
+    slots_per_zone = max(1, total_limit // len(ZONES))
+    seen_ids: set[str] = set()
+    artifacts: list[GameArtifact] = []
+
+    for zone in ZONES:
+        zone_picks: list[GameArtifact] = []
+
+        # 1순위: 해당 zone + 관심사 키워드 매칭 (랜덤 순서)
+        if keywords:
+            kw_conditions = or_(*(
+                or_(
+                    GameArtifact.name.ilike(f"%{kw}%"),
+                    GameArtifact.era.ilike(f"%{kw}%"),
+                    GameArtifact.persona.ilike(f"%{kw}%"),
+                    GameArtifact.greeting_fallback.ilike(f"%{kw}%"),
                 )
-                search_results = search_result.scalars().all()
-                
-                for a in search_results:
-                    if a.id in seen_ids or (a.name and a.name in seen_names):
-                        continue
-                        
+                for kw in keywords
+            ))
+            rows = await db.execute(
+                select(GameArtifact)
+                .where(GameArtifact.zone == zone, kw_conditions)
+                .order_by(func.random())
+                .limit(slots_per_zone)
+            )
+            for a in rows.scalars():
+                if a.id not in seen_ids:
+                    zone_picks.append(a)
                     seen_ids.add(a.id)
-                    if a.name:
-                        seen_names.add(a.name)
-                        
-                    artifacts.append(a)
-                    category_artifacts_count += 1
-                    
-                    # 현재 카테고리에서 목표한 개수를 채웠으면 루프 탈출
-                    if category_artifacts_count >= limit_per_category:
-                        break
-                        
-                if category_artifacts_count >= limit_per_category:
-                    break
-                    
-            # 전체 10개가 다 채워졌다면 최종 종료
-            if len(artifacts) >= total_limit:
-                break
 
-    # 4. 관심사가 없거나 검색 결과가 총 10개가 안 된다면 기본 유물로 잔여석 채우기
+        # 2순위: 해당 zone에서 키워드 무관하게 랜덤 (폴백)
+        if len(zone_picks) < slots_per_zone:
+            rows = await db.execute(
+                select(GameArtifact)
+                .where(
+                    GameArtifact.zone == zone,
+                    GameArtifact.id.notin_(seen_ids) if seen_ids else True,
+                )
+                .order_by(func.random())
+                .limit(slots_per_zone - len(zone_picks))
+            )
+            for a in rows.scalars():
+                if a.id not in seen_ids:
+                    zone_picks.append(a)
+                    seen_ids.add(a.id)
+
+        artifacts.extend(zone_picks)
+        if len(artifacts) >= total_limit:
+            break
+
+    # 3순위: zone 없는 유물 또는 부족한 슬롯 채우기 (랜덤)
     if len(artifacts) < total_limit:
-        default_result = await db.execute(
+        rows = await db.execute(
             select(GameArtifact)
-            .order_by(GameArtifact.number)
-            .limit(total_limit * 2)
+            .where(GameArtifact.id.notin_(seen_ids) if seen_ids else True)
+            .order_by(func.random())
+            .limit(total_limit - len(artifacts))
         )
-        default_results = default_result.scalars().all()
-
-        for a in default_results:
-            if len(artifacts) >= total_limit:
-                break
-            # 중복 검사
-            if a.id not in [art.id for art in artifacts] and (not a.name or a.name not in [art.name for art in artifacts]):
-                artifacts.append(a)
-                
+        artifacts.extend(rows.scalars().all())
 
     return [
         ArtifactSummary(
