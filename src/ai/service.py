@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.config import ai_settings
 from src.ai.constants import STAGE_GREETING, STAGE_PRAISE
 from src.ai.exceptions import AIServiceError
-from src.ai.schemas import ChatRequest, ChatResponse, PraiseRequest, PraiseResponse
+from src.ai.schemas import (
+    ChatRequest, ChatResponse,
+    PraiseRequest, PraiseResponse,
+    PraiseItem, PraiseItemResult, PraiseScoreRequest, PraiseScoreResponse,
+)
 from src.artifacts import service as artifacts_service
 from src.artifacts.schemas import ArtifactDB
 
@@ -136,3 +140,72 @@ JSON 형식으로만 답하세요: {{"score": 0.0~1.0, "feedback": "한 줄 피�
         return PraiseResponse(score=float(result["score"]), feedback=result["feedback"])
     except Exception as e:
         raise AIServiceError(f"칭찬 분석 오류: {e}")
+
+
+# ── 카드 등급 채점 ────────────────────────────────────────────────
+
+def _score_to_grade(score: float) -> str:
+    if score >= 0.75:
+        return "legendary"
+    if score >= 0.45:
+        return "rare"
+    return "common"
+
+
+def _sync_score_single_praise(artifact_name: str, era: str, praise_text: str) -> dict:
+    system_prompt = f"""당신은 국립중앙박물관 어린이 교육 전문가입니다.
+아이가 유물 '{artifact_name}'({era} 시대)에게 쓴 칭찬을 채점하세요.
+
+[채점 기준]
+- 진심과 감정이 담겨 있는가? (0~0.4점)
+- 유물 이름, 시대, 특징 등 구체적인 내용이 언급되었는가? (0~0.4점)
+- 문장이 성의 있게 작성되었는가? (0~0.2점)
+
+반드시 JSON 형식으로만 답하세요. 다른 텍스트 없이 JSON만:
+{{"score": 0.0~1.0, "feedback": "아이를 격려하는 한 줄 피드백 (15자 이내)"}}"""
+
+    client = _get_bedrock_client()
+    response = client.converse(
+        modelId=ai_settings.AI_MODEL,
+        system=[{"text": system_prompt}],
+        messages=[{"role": "user", "content": [{"text": praise_text}]}],
+        inferenceConfig={"maxTokens": 150},
+    )
+    raw = response["output"]["message"]["content"][0]["text"].strip()
+    # JSON 블록만 추출 (```json ... ``` 감싸인 경우 대비)
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return json.loads(raw)
+
+
+async def score_praises(request: PraiseScoreRequest, db: AsyncSession) -> PraiseScoreResponse:
+    loop = asyncio.get_event_loop()
+    results: list[PraiseItemResult] = []
+
+    for item in request.praises:
+        try:
+            data = await loop.run_in_executor(
+                None,
+                functools.partial(
+                    _sync_score_single_praise,
+                    item.artifact_name,
+                    item.era,
+                    item.praise_text,
+                ),
+            )
+            score = float(data.get("score", 0.3))
+            feedback = data.get("feedback", "잘 썼어요!")
+        except Exception:
+            score = 0.3
+            feedback = "잘 썼어요!"
+
+        results.append(PraiseItemResult(
+            artifact_id=item.artifact_id,
+            grade=_score_to_grade(score),
+            score=score,
+            feedback=feedback,
+        ))
+
+    return PraiseScoreResponse(results=results)

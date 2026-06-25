@@ -26,3 +26,27 @@ class PraiseRequest(CustomModel):
 class PraiseResponse(CustomModel):
     score: float       # 0.0~1.0 (보스 대미지 배율로 사용)
     feedback: str      # AI가 분석한 피드백 텍스트
+
+
+# ── 카드 등급 채점 (TOP3 개별 채점) ────────────────────────────────
+
+class PraiseItem(CustomModel):
+    artifact_id: str    # artifact_001 등
+    artifact_name: str  # 한국어 유물명
+    era: str            # 시대 (예: 신라)
+    praise_text: str    # 유저가 입력한 칭찬
+
+
+class PraiseItemResult(CustomModel):
+    artifact_id: str
+    grade: str          # common | rare | legendary
+    score: float        # 0.0~1.0
+    feedback: str       # AI 한 줄 칭찬 피드백
+
+
+class PraiseScoreRequest(CustomModel):
+    praises: list[PraiseItem]
+
+
+class PraiseScoreResponse(CustomModel):
+    results: list[PraiseItemResult]
