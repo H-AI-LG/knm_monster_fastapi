@@ -17,7 +17,6 @@ from src.ai.schemas import (
     PraiseItem, PraiseItemResult, PraiseScoreRequest, PraiseScoreResponse,
 )
 from src.artifacts import service as artifacts_service
-from src.artifacts.schemas import ArtifactDB
 
 # boto3는 동기 클라이언트 — 호출 시 thread pool executor로 비동기화
 def _get_bedrock_client():
@@ -30,29 +29,23 @@ def _get_bedrock_client():
     return boto3.client("bedrock-runtime", **kwargs)
 
 
-def _build_system_prompt(artifact: ArtifactDB, stage: str) -> str:
+def _build_system_prompt_from_game(game_artifact, stage: str) -> str:
     info_lines = []
-    if artifact.temporal:
-        info_lines.append(f"- 시대: {artifact.temporal}")
-    if artifact.medium:
-        info_lines.append(f"- 재질: {artifact.medium}")
-    if artifact.extent:
-        info_lines.append(f"- 크기: {artifact.extent}")
-    if artifact.spatial:
-        info_lines.append(f"- 출토/소장지: {artifact.spatial}")
-    if artifact.subdescription:
-        info_lines.append(f"- 분류: {artifact.subdescription}")
-    if artifact.description:
-        info_lines.append(f"- 설명: {artifact.description}")
+    if game_artifact.era:
+        info_lines.append(f"- 시대: {game_artifact.era}")
+    if game_artifact.persona:
+        info_lines.append(f"- 캐릭터 성격: {game_artifact.persona}")
+    if game_artifact.greeting_fallback:
+        info_lines.append(f"- 첫 인사 예시: {game_artifact.greeting_fallback}")
 
     artifact_info = "\n".join(info_lines) if info_lines else "정보 없음"
 
-    base = f"""당신은 국립중앙박물관에 소장된 유물 '{artifact.title}'의 정령입니다.
+    base = f"""당신은 국립중앙박물관에 소장된 유물 '{game_artifact.name}'의 정령입니다.
 
 [유물 정보]
 {artifact_info}
 
-당신은 디지털 기술 만능주의 시대에 람들이 유물에 관심을 잃어가자 상처받아 삐진 유물 정령입니다.
+당신은 디지털 기술 만능주의 시대에 사람들이 유물에 관심을 잃어가자 상처받아 삐진 유물 정령입니다.
 방문한 아이가 진심을 보여주면 마음을 열어주는 캐릭터입니다.
 - 반드시 한국어로 대화하세요.
 - 아이 눈높이에 맞게 친근하고 재미있게 말하세요.
@@ -82,22 +75,19 @@ def _sync_converse(system_prompt: str, message: str, max_tokens: int) -> str:
 
 async def chat(request: ChatRequest, db: AsyncSession) -> ChatResponse:
     try:
-        artifact = await artifacts_service.get_by_name(request.artifact_name, db)
-        artifact_schema = artifacts_service.to_schema(artifact)
+        game_artifact = await artifacts_service.get_game_artifact(request.artifact_id, db)
     except Exception:
-        artifact_schema = ArtifactDB(
-            id=0,
-            title=request.artifact_name,
-            description="",
-            subdescription="",
-            temporal="",
-            spatial="",
-            medium="",
-            extent="",
-            url="",
+        from src.artifacts.models import GameArtifact as _GA
+        game_artifact = _GA(
+            id=request.artifact_id,
+            number="000",
+            name=request.artifact_name,
+            era="",
+            persona="",
+            greeting_fallback="",
         )
 
-    system_prompt = _build_system_prompt(artifact_schema, request.stage)
+    system_prompt = _build_system_prompt_from_game(game_artifact, request.stage)
 
     try:
         loop = asyncio.get_event_loop()
